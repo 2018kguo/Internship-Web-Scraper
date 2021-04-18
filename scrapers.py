@@ -8,13 +8,21 @@ from aiohttp import ClientSession
 import requests
 
 class LinkedInScraper:
-    def __init__(self, searchTerms: List[str], locations: List[str], jobTitles: List[str] = None, 
-                 blacklistSubstrings: List[str] = None, requiredSubstrings: List[str] = None) -> None:
+    def __init__(self, searchTerms: List[str], locations: List[str], jobTitles: List[str] = None, blacklistJobTitles: List[str] = None,
+                 blacklistSubstrings: List[str] = None, requiredSubstrings: List[str] = None, timespan: str = None) -> None:
         self.searchTerms = searchTerms
         self.locations = locations
         self.jobTitles = jobTitles
         self.blacklistSubstrings = blacklistSubstrings
         self.requiredSubstrings = requiredSubstrings
+        self.blacklistJobTitles = blacklistJobTitles
+
+        validTimespanToSecondsDict = {
+            "day": "r86400",
+            "week": "r604800",
+            "month": "r2592000"
+        }
+        self.timespan = validTimespanToSecondsDict[timespan] if timespan in validTimespanToSecondsDict else None
 
     async def fetchHTML(self, url: str, session: ClientSession) -> str:
         resp = await session.request(method="GET", url=url)
@@ -36,15 +44,18 @@ class LinkedInScraper:
         htmlList = []
         #Going off of about 4 requests per second rate limit
         approxTimeDelay = len(self.searchTerms) / 4.0
+
+        timeSpanArg = "&f_TPR=" + self.timespan if self.timespan is not None else ""
+
         async with aiohttp.ClientSession() as session:
             for cityCode in cityCodes:
                 for searchTerm in self.searchTerms:
-                    requestStr = "https://www.linkedin.com/jobs/search?keywords={}&f_PP={}".format(searchTerm, cityCode)
+                    requestStr = "https://www.linkedin.com/jobs/search?keywords={}&f_PP={}{}".format(searchTerm, cityCode, timeSpanArg)
                     html = await self.fetchHTML(requestStr, session)
                     htmlList.append(html) 
                 #prevent rate limiting
                 time.sleep(approxTimeDelay)
-                print("Gathered HTML for job postings in {} cities".format(len(htmlList)))
+                print("Gathered HTML for job postings in {} city-specific queries".format(len(htmlList)))
         return htmlList
 
     async def gatherHTMLForJobPostings(self, jobLinks: List[str]) -> List[str]:
@@ -127,8 +138,13 @@ class LinkedInScraper:
         return True    
 
     def filterJobTitles(self, jobTitle:str) -> bool:
-        #if any one of our required job titles in the job title, return true
+        #if any one of our required job titles in the job title and none of the blacklist keywords, return true
         lowerTitle = jobTitle.lower()
+        blacklistJobTitles = self.blacklistJobTitles
+        if blacklistJobTitles is not None and len(blacklistJobTitles) > 0:
+            for blacklistTitle in blacklistJobTitles:
+                if blacklistTitle.lower() in lowerTitle:
+                    return False
         titles = self.jobTitles
         if titles is not None and len(titles) > 0:
             for title in titles:
@@ -145,18 +161,8 @@ class LinkedInScraper:
 
         for html in jobPostingsList:
             soup = BeautifulSoup(html, features="html.parser")
-            
-            # jobTitleTag = soup.find('h1', class_=['topcard__title'])
-            # if(jobTitleTag is None):
-            #     numFailed += 1 
-            #     continue        
-
-            # jobTitle = jobTitleTag.string
-            # if not self.filterJobTitles(jobTitle):
-            #     numFailed += 1 
-            #     continue
-
             companyTag = soup.find('a', class_=['sub-nav-cta__optional-url'])
+            
             if(companyTag is None):
                 numFailed += 1 
                 continue

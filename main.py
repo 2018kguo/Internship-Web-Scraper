@@ -54,9 +54,11 @@ def scrapeLinkedIn(config: Configuration) -> List[JobListing]:
     queries = config["linkedIn"]["queries"].get()
     locations = config["linkedIn"]["locationsToQuery"].get()
     titles = config["linkedIn"]["desiredJobTitles"].get()
+    blacklistTitles = config["linkedIn"]["blacklistJobTitles"].get()
     blacklist = config["linkedIn"]["description"]["blacklistSubstrings"].get()
     required = config["linkedIn"]["description"]["requiredSubstrings"].get()
-    scraper = LinkedInScraper(queries, locations, titles, blacklist, required)
+    timespan = config["linkedIn"]["timespan"].get()
+    scraper = LinkedInScraper(queries, locations, titles, blacklistTitles, blacklist, required, timespan)
     jobs = scraper.scrapeJobs()
     return jobs
 
