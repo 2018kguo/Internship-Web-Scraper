@@ -1,0 +1,5 @@
+aiohttp>=3.0.3
+beautifulsoup4>=4.9.3
+asyncio>=3.4.3
+requests>=2.23.0
+confuse>=1.4.0

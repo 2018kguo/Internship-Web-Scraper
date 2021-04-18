@@ -1,0 +1,49 @@
+github:
+  enabled: true
+  repoURL: "https://github.com/pittcsc/Summer2022-Internships"
+linkedIn:
+  enabled: true
+  queries: 
+    - "software engineer intern"
+    - "software engineering internship"
+  desiredJobTitles: 
+    - "intern"
+    - "co-op"
+  description:
+    blacklistSubstrings: 
+      - "unpaid"
+    requiredSubstrings: ["interns"]
+  locationsToQuery:
+    - "United States"
+    - "Remote"
+    - "Boston"
+    - "New York City"
+    - "Austin"
+    - "Dallas"
+    - "Chicago"
+    - "Boulder"
+    - "Pittsburgh"
+    - "McLean"
+    - "California"
+    - "Bay Area"
+    - "San Francisco"
+    - "Mountain View"
+    - "Sunnyvale"
+    - "Menlo Park"
+    - "Palo Alto"
+    - "San Mateo"
+    - "Los Angeles"
+    - "Santa Clara"
+    - "Cupertino"
+    - "San Diego"
+    - "Novato"
+    - "San Ramon"
+    - "Irvine"
+    - "Foster City"
+    - "Newark"
+    - "Fremont"
+    - "Berkeley"
+    - "Seattle"
+    - "Bellevue"
+    - "Redmond"
+    - "Kirkland"
