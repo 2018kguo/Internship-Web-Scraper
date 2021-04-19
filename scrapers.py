@@ -40,22 +40,12 @@ class LinkedInScraper:
                 htmlList.append(html)
         return htmlList
 
-    async def gatherCityLevelSearch(self, cityCodes: List[str]) -> List[str]:
+    async def gatherCityLevelSearch(self, requests: List[str]) -> List[str]:
         htmlList = []
-        #Going off of about 4 requests per second rate limit
-        approxTimeDelay = len(self.searchTerms) / 4.0
-
-        timeSpanArg = "&f_TPR=" + self.timespan if self.timespan is not None else ""
-
         async with aiohttp.ClientSession() as session:
-            for cityCode in cityCodes:
-                for searchTerm in self.searchTerms:
-                    requestStr = "https://www.linkedin.com/jobs/search?keywords={}&f_PP={}{}".format(searchTerm, cityCode, timeSpanArg)
-                    html = await self.fetchHTML(requestStr, session)
-                    htmlList.append(html) 
-                #prevent rate limiting
-                time.sleep(approxTimeDelay)
-                print("Gathered HTML for job postings in {} city-specific queries".format(len(htmlList)))
+            for request in requests:
+                html = await self.fetchHTML(request, session)
+                htmlList.append(html) 
         return htmlList
 
     async def gatherHTMLForJobPostings(self, jobLinks: List[str]) -> List[str]:
@@ -70,9 +60,9 @@ class LinkedInScraper:
         #doing this instead of asyncio.run because of this issue: https://github.com/aio-libs/aiohttp/issues/4324
         return asyncio.get_event_loop().run_until_complete(self.gatherTopLevelSearchForLocations())
 
-    def getCityLevelSearch(self, cityCodes: List[str]) -> List[str]:
+    def getCityLevelSearch(self, requests: List[str]) -> List[str]:
         #doing this instead of asyncio.run because of this issue: https://github.com/aio-libs/aiohttp/issues/4324
-        return asyncio.get_event_loop().run_until_complete(self.gatherCityLevelSearch(cityCodes))
+        return asyncio.get_event_loop().run_until_complete(self.gatherCityLevelSearch(requests))
 
     def getJobPostingsHTML(self, jobLinks: List[str]) -> List[str]:
         return asyncio.get_event_loop().run_until_complete(self.gatherHTMLForJobPostings(jobLinks))
@@ -191,6 +181,25 @@ class LinkedInScraper:
 
         print("Skipped {} postings because they were duplicates and {} because they failed to meet criteria".format(numSkipped, numFailed))
         return jobInformation
+        
+    def getCityLevelSearchInBatches(self, cityCodes: List[str]) -> List[str]:
+        citySearchHTMLList = []
+
+        approxTimeDelay = len(self.searchTerms) / 4.0
+
+        timeSpanArg = "&f_TPR=" + self.timespan if self.timespan is not None else ""
+
+        for cityCode in cityCodes:
+            requests = []
+            for searchTerm in self.searchTerms:
+                requestStr = "https://www.linkedin.com/jobs/search?keywords={}&f_PP={}{}".format(searchTerm, cityCode, timeSpanArg)
+                requests.append(requestStr)
+            cityHTML = self.getCityLevelSearch(requests)
+            citySearchHTMLList.extend(cityHTML)
+            print("Gathered HTML for job postings in {} city-specific queries".format(len(citySearchHTMLList)))
+            time.sleep(approxTimeDelay)
+
+        return citySearchHTMLList
 
     def getJobPostingsInBatches(self, jobLinks: List[str]) -> List[str]:
         jobPostingsHTMLList = []
@@ -222,12 +231,9 @@ class LinkedInScraper:
         print("Searching for jobs in the following locations: {}".format(", ".join(self.locations)))
         topLevelSearchHTMLList = self.getTopLevelSearch()
         cityCodes = self.getUniqueCityCodes(topLevelSearchHTMLList)
-        time.sleep(5)
 
         print("Narrowing down search to specific LinkedIn city codes: {}".format(", ".join(cityCodes)))
-        citySearchHTMLList = self.getCityLevelSearch(cityCodes)
-        #just in case there are a lot of locations passed in which could get us close to the rate limit
-        time.sleep(5)
+        citySearchHTMLList = self.getCityLevelSearchInBatches(cityCodes)
         
         jobLinks = self.parseJobLinksFromTopLevelSearches(citySearchHTMLList)
         print("Found {} job links".format(len(jobLinks)))

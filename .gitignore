@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+#WIP
+scraper-react/
+
 # C extensions
 *.so
 
