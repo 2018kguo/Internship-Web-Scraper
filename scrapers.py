@@ -262,10 +262,10 @@ class GithubScraper:
 
         for internship in soup.select("article table tbody tr"):
             internship_details = internship.find_all("td")
+            company = internship_details[0].string
             for detail in internship_details:
                 links = detail.find_all("a")
                 for link in links:
-                    company = link.string
                     linkURL = link.get("href")
                     newListing = JobListing(company, linkURL)
                     jobList.append(newListing)
