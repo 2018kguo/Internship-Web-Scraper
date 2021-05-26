@@ -33,19 +33,23 @@ class LinkedInScraper:
         
     async def gatherTopLevelSearchForLocations(self) -> List[str]:
         htmlList = []
-        async with aiohttp.ClientSession() as session:
-            for location in self.locations:
-                requestStr = "https://www.linkedin.com/jobs/search?keywords={}&location={}".format(self.searchTerms[0], location)
-                html = await self.fetchHTML(requestStr, session)
-                htmlList.append(html)
+        semaphore = asyncio.Semaphore(2)
+        async with semaphore:
+            async with aiohttp.ClientSession() as session:
+                for location in self.locations:
+                    requestStr = "https://www.linkedin.com/jobs/search?keywords={}&location={}".format(self.searchTerms[0], location)
+                    html = await self.fetchHTML(requestStr, session)
+                    htmlList.append(html)
         return htmlList
 
     async def gatherCityLevelSearch(self, requests: List[str]) -> List[str]:
         htmlList = []
-        async with aiohttp.ClientSession() as session:
-            for request in requests:
-                html = await self.fetchHTML(request, session)
-                htmlList.append(html) 
+        semaphore = asyncio.Semaphore(2)
+        async with semaphore:
+            async with aiohttp.ClientSession() as session:
+                for request in requests:
+                    html = await self.fetchHTML(request, session)
+                    htmlList.append(html) 
         return htmlList
 
     async def gatherHTMLForJobPostings(self, jobLinks: List[str]) -> List[str]:
@@ -73,25 +77,25 @@ class LinkedInScraper:
         
         for html in searchList:
             soup = BeautifulSoup(html, features="html.parser")
-            for jobCard in soup.select("main div ul li"):
+            for jobCard in soup.select("ul.jobs-search__results-list"):
                 companyName = None
                 jobTitle = None
 
                 jobTitleTag = jobCard.find("span", class_=["screen-reader-text"])
                 if jobTitleTag is not None:
-                    jobTitle = jobTitleTag.string
+                    jobTitle = str(jobTitleTag.string).strip()
                     if not self.filterJobTitles(jobTitle):
                         continue
 
-                companyNameTag = jobCard.find("a", class_=["job-result-card__subtitle-link"])
+                companyNameTag = jobCard.find("a", class_=["job-search-card__subtitle"])
                 if companyNameTag is not None:
-                    companyName = companyNameTag.string
-
+                    companyName = str(companyNameTag.string).strip()
+                
                 if companyName is not None and jobTitle is not None:
                     hashString = companyName + "_" + jobTitle
                     if hashString not in seenJobHashes:
                         seenJobHashes.add(hashString)
-                        jobPostDetails = jobCard.find("a", class_=["result-card__full-card-link"])
+                        jobPostDetails = jobCard.find("a", class_=["base-card__full-link"])
                         jobPostLink = jobPostDetails.get("href")
                         jobLinks.append(jobPostLink)
 
@@ -152,7 +156,6 @@ class LinkedInScraper:
         for html in jobPostingsList:
             soup = BeautifulSoup(html, features="html.parser")
             companyTag = soup.find('a', class_=['sub-nav-cta__optional-url'])
-            
             if(companyTag is None):
                 numFailed += 1 
                 continue
@@ -205,7 +208,7 @@ class LinkedInScraper:
         jobPostingsHTMLList = []
         #From some manual testing, the rate limit seems to be around 4 requests per second.
         #Raising this rate may lead to data being lost due to rate limiting and 429 status codes
-        batchSize = 20
+        batchSize = 10
         timeDelaySeconds = 5
 
         curIndex = 0
@@ -234,10 +237,12 @@ class LinkedInScraper:
 
         print("Narrowing down search to specific LinkedIn city codes: {}".format(", ".join(cityCodes)))
         citySearchHTMLList = self.getCityLevelSearchInBatches(cityCodes)
+
         
         jobLinks = self.parseJobLinksFromTopLevelSearches(citySearchHTMLList)
         print("Found {} job links".format(len(jobLinks)))
         jobPostingsHTMLList = self.getJobPostingsInBatches(jobLinks)
+
         jobInformation = self.parseJobInformationFromJobLinks(jobPostingsHTMLList)
 
         print("Found {} related job postings on LinkedIn".format(len(jobInformation)))
@@ -257,7 +262,6 @@ class GithubScraper:
 
         for internship in soup.select("article table tbody tr"):
             internship_details = internship.find_all("td")
-            #print(internship_details)
             for detail in internship_details:
                 links = detail.find_all("a")
                 for link in links:
