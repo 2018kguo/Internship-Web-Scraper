@@ -169,7 +169,12 @@ class LinkedInScraper:
                 continue
 
             allLinks = [link.get('href') for link in soup.find_all('a')]
-            jobLink = next((link for link in allLinks if "externalApply" in link), "N/A")
+            jobLink = next((link for link in allLinks if "externalApply" in link), None)
+
+            if jobLink is None:
+                numFailed += 1 
+                continue
+            
             #Everything from &refId onwards in the linkedIn URL can vary for the same posting - so remove it
             refIdIndex = jobLink.find("&refId")
             if refIdIndex != -1:
@@ -224,6 +229,13 @@ class LinkedInScraper:
 
         return jobPostingsHTMLList
 
+    def getRedirectUrl(self, url: str) -> str:
+        try:
+            r = requests.get(url) 
+            return r.url
+        except:
+            return url
+
     def scrapeJobs(self) -> List[JobListing]:
         print("Starting LinkedIn scrape...")
         
@@ -231,19 +243,24 @@ class LinkedInScraper:
             print("searchTerms and locations cannot be empty")
             return None
 
+        time.sleep(1)
         print("Searching for jobs in the following locations: {}".format(", ".join(self.locations)))
         topLevelSearchHTMLList = self.getTopLevelSearch()
         cityCodes = self.getUniqueCityCodes(topLevelSearchHTMLList)
 
+        time.sleep(1)
         print("Narrowing down search to specific LinkedIn city codes: {}".format(", ".join(cityCodes)))
         citySearchHTMLList = self.getCityLevelSearchInBatches(cityCodes)
-
-        
         jobLinks = self.parseJobLinksFromTopLevelSearches(citySearchHTMLList)
         print("Found {} job links".format(len(jobLinks)))
-        jobPostingsHTMLList = self.getJobPostingsInBatches(jobLinks)
 
+        time.sleep(1)
+        jobPostingsHTMLList = self.getJobPostingsInBatches(jobLinks)
         jobInformation = self.parseJobInformationFromJobLinks(jobPostingsHTMLList)
+
+        for jobListing in jobInformation:
+            jobListing.link = self.getRedirectUrl(jobListing.link)
+            time.sleep(0.5)
 
         print("Found {} related job postings on LinkedIn".format(len(jobInformation)))
         sortedJobs = sorted(jobInformation, key=lambda job: job.company)

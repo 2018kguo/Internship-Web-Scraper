@@ -2,11 +2,10 @@ github:
   enabled: true
   repoURL: "https://github.com/pittcsc/Summer2022-Internships"
 linkedIn:
-  enabled: false
-  timespan: "day"
+  enabled: true
+  timespan: "week"
   queries: 
     - "software engineer intern"
-    - "software development intern"
     - "backend engineer intern"
   desiredJobTitles: 
     - "intern"
